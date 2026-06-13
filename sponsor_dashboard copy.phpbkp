@@ -1,0 +1,76 @@
+<?php
+session_start();
+require_once 'db_connect.php';
+
+// Access Control Security Guard: Allow Sponsor OR Admin
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'Sponsor' && $_SESSION['role'] !== 'Admin')) {
+    header("Location: login.php");
+    exit();
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sponsor Portal</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background-color: #f4f6f9; }
+        .admin-nav { background-color: #343a40; padding: 10px 20px; display: flex; gap: 15px; align-items: center; color: white; font-size: 14px; }
+        .admin-nav a { color: #ffc107; text-decoration: none; font-weight: bold; padding: 5px 10px; border: 1px solid #ffc107; border-radius: 4px; }
+        .admin-nav a:hover { background-color: #ffc107; color: black; }
+        .navbar { background-color: #0f766e; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
+        .navbar h1 { margin: 0; font-size: 20px; }
+        .navbar a { color: white; text-decoration: none; margin-left: 20px; }
+        .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+        .welcome-box { background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        .dashboard-layout { display: flex; gap: 25px; }
+        .child-profile-preview { flex: 2; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .message-panel { flex: 1; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-message { display: block; width: 100%; text-align: center; background-color: #0f766e; color: white; padding: 12px; border-radius: 4px; text-decoration: none; font-weight: bold; box-sizing: border-box; }
+        .btn-logout { background-color: #b91c1c; padding: 8px 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<?php if ($_SESSION['role'] === 'Admin'): ?>
+    <div class="admin-nav">
+        <strong>⚡ Admin View Mode:</strong> Go to: 
+        <a href="admin_dashboard.php">Admin Panel</a>
+        <a href="coordinator_dashboard.php">Coordinator Panel</a>
+        <a href="sponsor_dashboard.php" style="background:#ffc107; color:black;">Sponsor Portal</a>
+    </div>
+<?php endif; ?>
+
+<div class="navbar">
+    <h1>🤝 Sponsor Engagement Portal</h1>
+    <div>
+        <a href="#">My Profile</a>
+        <a href="logout.php" class="btn-logout">Logout</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="welcome-box">
+        <h2>Welcome Back, <?php echo htmlspecialchars($_SESSION['username']); ?>!</h2>
+        <p>Role Group Status: <strong><?php echo $_SESSION['role']; ?></strong></p>
+        <p>Thank you for making a lasting difference. Here you can review your sponsored child's update records and exchange letters.</p>
+    </div>
+
+    <div class="dashboard-layout">
+        <div class="child-profile-preview">
+            <h3>My Sponsored Child Profile</h3>
+            <hr style="border: 0; border-top: 1px solid #eee;">
+            <p style="color: #666; font-style: italic;">No child profile is currently linked to your active sponsorship account. Once a coordinator links your profile, details will populate here.</p>
+        </div>
+
+        <div class="message-panel">
+            <h3>Coordinator Channel</h3>
+            <p style="font-size: 14px; color: #555;">All communication is safely routed through system coordinators to secure child safety privacy boundaries.</p>
+            <a href="#" class="btn-message">📬 Write a Letter</a>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
