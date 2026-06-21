@@ -14,8 +14,9 @@ $sponsor_id = '';
 $sponsor_name = $_SESSION['username'];
 
 // Fetch alphanumeric ID mapping details from your dedicated sponsors table structure
-$sp_stmt = $conn->prepare("SELECT id, first_name, last_name FROM sponsors WHERE user_id = ?");
-$sp_stmt->bind_param("i", $user_id);
+// Fallback: If 'id' is the primary key and corresponds to your session user_id:
+$sp_stmt = $conn->prepare("SELECT id, first_name, last_name FROM sponsors WHERE id = ?");
+$sp_stmt->bind_param("s", $user_id); // Changed parameter bind column from user_id to id
 $sp_stmt->execute();
 $sp_res = $sp_stmt->get_result();
 
@@ -23,6 +24,9 @@ if ($sp_res->num_rows === 1) {
     $sponsor_row = $sp_res->fetch_assoc();
     $sponsor_id = $sponsor_row['id'];
     $sponsor_name = $sponsor_row['first_name'] . ' ' . $sponsor_row['last_name'];
+} else {
+    // If no row is matched, assign the session user_id directly as a fallback
+    $sponsor_id = ($_SESSION['sponsor_id']);
 }
 $sp_stmt->close();
 
@@ -115,7 +119,7 @@ if (!empty($sponsor_id)) {
 
     <div class="dashboard-layout">
         <div class="child-profile-preview">
-            <div class="card-title">My Sponsored Beneficiaries</div>
+            <div class="card-title">My Sponsored Beneficiaries </div>
             
             <?php if (count($sponsored_children) > 0): ?>
                 <div class="child-grid">
@@ -151,6 +155,11 @@ if (!empty($sponsor_id)) {
             </p>
         </div>
     </div>
+
+    <pre style="background: #222; color: #00ff00; padding: 15px; border-radius: 5px; margin: 20px; font-size: 13px; overflow: auto;">
+    <strong>Active Session Dump Matrix:</strong>
+    <?php print_r($_SESSION); ?>
+</pre>
 </div>
 
 </body>

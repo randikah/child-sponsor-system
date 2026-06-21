@@ -7,7 +7,7 @@ $message_class = '';
 
 // Determine Mode: Update vs Create
 $is_update_mode = false;
-$sponsor_id = ''; // Now acts as a VARCHAR string tracker (e.g., S000000001)
+$sponsor_id = ''; 
 
 // Form field default values
 $first_name = '';
@@ -16,12 +16,13 @@ $residence_country = '';
 $language = '';
 $dob = '';
 $age = '';
-$status = 'Active'; // Default status value
+$status = 'Active'; 
+$email = ''; // Added for login integration
 
 // Calculate the maximum allowed date of birth (Exactly 20 years ago from today)
 $max_dob_allowed = date('Y-m-d', strtotime('-20 years'));
 
-// 1. DYNAMIC SEARCH FUNCTIONALITY (Triggered via Search GET request or URL parameter)
+// 1. DYNAMIC SEARCH FUNCTIONALITY
 $search_id = '';
 if (isset($_GET['search_id']) && !empty(trim($_GET['search_id']))) {
     $search_id = trim($_GET['search_id']);
@@ -33,7 +34,7 @@ if (!empty($search_id)) {
     $is_update_mode = true;
     $sponsor_id = $search_id;
 
-    // Fetch existing records using the VARCHAR id (including status column)
+    // Fetch existing records (Join with users table to display email if needed, or keep separate)
     $stmt = $conn->prepare("SELECT first_name, last_name, residence_country, language, dob, age, status FROM sponsors WHERE id = ?");
     $stmt->bind_param("s", $sponsor_id);
     $stmt->execute();
@@ -54,7 +55,7 @@ if (!empty($search_id)) {
     } else {
         $message = "❌ Error: Sponsor account record [" . htmlspecialchars($sponsor_id) . "] not found.";
         $message_class = "error-msg";
-        $is_update_mode = false; // Fallback to creation mode if record doesn't exist
+        $is_update_mode = false; 
         $sponsor_id = '';
     }
     $stmt->close();
@@ -62,24 +63,22 @@ if (!empty($search_id)) {
 
 // 2. HANDLE FORM SUBMISSIONS (POST REQUESTS)
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Using null coalescing assignment operators to permanently eliminate "Undefined array key" warnings
     $first_name = trim($_POST['first_name'] ?? '');
     $last_name = trim($_POST['last_name'] ?? '');
     $residence_country = trim($_POST['residence_country'] ?? '');
     $language = trim($_POST['language'] ?? '');
     $dob = trim($_POST['dob'] ?? '');
     $age = intval($_POST['age'] ?? 0);
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
     
-    // Check toggle switch state: if checked = Active, if unchecked/unset = Inactive
     $status = isset($_POST['status']) ? 'Active' : 'Inactive';
-    
     $action_mode = isset($_POST['action_mode']) ? $_POST['action_mode'] : 'create';
     $form_sponsor_id = isset($_POST['sponsor_id']) ? trim($_POST['sponsor_id']) : '';
 
-    // Form inputs validation execution
+    // Field Validation Base Check
     if (!empty($first_name) && !empty($last_name) && !empty($residence_country) && !empty($language) && !empty($dob) && $age > 0) {
         
-        // Backend verification check ensuring selected date is strictly greater than 20 years old
         if (strtotime($dob) > strtotime($max_dob_allowed)) {
             $message = "❌ Policy Error: Registered system sponsors must be at least 20 years of age.";
             $message_class = "error-msg";
@@ -89,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         } else {
             if ($action_mode === 'update' && !empty($form_sponsor_id)) {
-                // EXECUTE RECORD UPDATE USING ALPHANUMERIC ID WITH STATUS MATCH INJECTION
+                // UPDATE SPONSOR RECORD
                 $stmt = $conn->prepare("UPDATE sponsors SET first_name = ?, last_name = ?, residence_country = ?, language = ?, dob = ?, age = ?, status = ? WHERE id = ?");
                 $stmt->bind_param("sssssiss", $first_name, $last_name, $residence_country, $language, $dob, $age, $status, $form_sponsor_id);
                 
@@ -97,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $message = "✓ Sponsor profile records for [$form_sponsor_id] updated successfully!";
                     $message_class = "success-msg";
                     $sponsor_id = $form_sponsor_id;
-                    $is_update_mode = true; // Maintain persistent edit-state view
+                    $is_update_mode = true; 
                 } else {
                     $message = "❌ Execution Error updating database row: " . $stmt->error;
                     $message_class = "error-msg";
@@ -105,34 +104,60 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $stmt->close();
                 
             } else {
-                // EXECUTE NEW SPONSOR INSERTION WITH STATUS COLUMN VALUE
-                $stmt = $conn->prepare("INSERT INTO sponsors (first_name, last_name, residence_country, language, dob, age, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("sssssis", $first_name, $last_name, $residence_country, $language, $dob, $age, $status);
-
-                if ($stmt->execute()) {
-                    // Get the generated numeric primary key ID
-                    $last_inserted_num = $conn->insert_id;
-
-                    // Query the database to retrieve the generated alphanumeric string directly
-                    $fetch_stmt = $conn->prepare("SELECT id FROM sponsors WHERE internal_id = ?");
-                    $fetch_stmt->bind_param("i", $last_inserted_num);
-                    $fetch_stmt->execute();
-                    $res = $fetch_stmt->get_result();
-                    $row = $res->fetch_assoc();
-                    $assigned_id = $row['id'] ?? "S" . str_pad($last_inserted_num, 9, "0", STR_PAD_LEFT);
-                    $fetch_stmt->close();
-
-                    $message = "✓ New Sponsor saved successfully! Assigned Alphanumeric ID: <strong>$assigned_id</strong>";
-                    $message_class = "success-msg";
-                    
-                    // Flush variables out cleanly to prepare interface form for empty input sequence
-                    $first_name = $last_name = $residence_country = $language = $dob = $age = '';
-                    $status = 'Active';
-                } else {
-                    $message = "❌ Database insert processing failure: " . $stmt->error;
+                // NEW SPONSOR CREATION WITH CORRESPONDING USER ACCOUNT LOGIN (TRANSACTION BASE)
+                if (empty($email) || empty($password)) {
+                    $message = "❌ Registration Error: Email and Password fields are required for new login creation.";
                     $message_class = "error-msg";
+                } else {
+                    // Start Database Transaction
+                    $conn->begin_transaction();
+
+                    try {
+                        // 1. Insert into sponsors table
+                        $stmt = $conn->prepare("INSERT INTO sponsors (first_name, last_name, residence_country, language, dob, age, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        $stmt->bind_param("sssssis", $first_name, $last_name, $residence_country, $language, $dob, $age, $status);
+                        $stmt->execute();
+                        
+                        $last_inserted_num = $conn->insert_id;
+                        $stmt->close();
+
+                        // Fetch or format the generated alphanumeric assigned ID string
+                        $fetch_stmt = $conn->prepare("SELECT id FROM sponsors WHERE internal_id = ?");
+                        $fetch_stmt->bind_param("i", $last_inserted_num);
+                        $fetch_stmt->execute();
+                        $res = $fetch_stmt->get_result();
+                        $row = $res->fetch_assoc();
+                        $assigned_id = $row['id'] ?? "S" . str_pad($last_inserted_num, 9, "0", STR_PAD_LEFT);
+                        $fetch_stmt->close();
+
+                        // 2. Create the System Login in the `users` table
+                        // Username auto-generated using prefix format (e.g., Sponsor_S000000001)
+                        $username = "Sponsor" . $last_inserted_num; 
+                        $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+                        $role = 'Sponsor';
+
+                        $user_stmt = $conn->prepare("INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)");
+                        $user_stmt->bind_param("ssss", $username, $email, $hashed_password, $role);
+                        $user_stmt->execute();
+                        $user_stmt->close();
+
+                        // Commit Transaction if everything succeeds
+                        $conn->commit();
+
+                        $message = "✓ New Sponsor saved successfully! Assigned Alphanumeric ID: <strong>$assigned_id</strong>. Account login username created: <strong>$username</strong>";
+                        $message_class = "success-msg";
+                        
+                        // Clear form out cleanly
+                        $first_name = $last_name = $residence_country = $language = $dob = $age = $email = '';
+                        $status = 'Active';
+
+                    } catch (Exception $e) {
+                        // Rollback state changes if an error is encountered
+                        $conn->rollback();
+                        $message = "❌ Database Transaction Failure: " . $e->getMessage();
+                        $message_class = "error-msg";
+                    }
                 }
-                $stmt->close();
             }
         }
     } else {
@@ -153,11 +178,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title><?php echo $is_update_mode ? 'Modify Sponsor Info' : 'Add New Sponsor'; ?></title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; display: flex; flex-direction: column; }
-        
         .container { max-width: 750px; background: white; margin: 30px auto; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
         h2 { text-align: center; color: #1e3a8a; margin-bottom: 5px; }
         p.subtitle { text-align: center; color: #718096; margin-bottom: 25px; font-size: 14px; }
-        
         .search-card { background: #f0f4f8; padding: 20px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #cbd5e0; }
         .search-form { display: flex; gap: 10px; }
         .search-form input { flex-grow: 1; padding: 12px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 15px; font-weight: bold; text-transform: uppercase; background-color: #ffffff; }
@@ -165,36 +188,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .btn-search:hover { background-color: #2c5282; }
         .clear-btn { display: flex; align-items: center; justify-content: center; background-color: #e67e22; color: white; border: none; padding: 0 15px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px; text-decoration: none; text-align: center; white-space: nowrap; }
         .clear-btn:hover { background-color: #d35400; }
-
         .section-divider { background-color: #f0f4f8; padding: 10px; font-weight: bold; color: #1e3a8a; margin: 25px 0 15px 0; border-left: 4px solid #1e3a8a; border-radius: 2px; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .full-width { grid-column: span 2; }
         label { display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 4px; }
         input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 4px; box-sizing: border-box; font-size: 14px; background-color: #fff; }
         input:focus, select:focus { border-color: #1e3a8a; outline: none; box-shadow: 0 0 4px rgba(30, 58, 138, 0.2); }
-        
-        /* Premium CSS Switch Slide Bar Component Styles */
         .status-container { display: flex; align-items: center; justify-content: space-between; background-color: #f8fafc; padding: 12px 18px; border: 1px solid #cbd5e0; border-radius: 6px; }
         .status-label-group { display: flex; flex-direction: column; }
         .status-title { font-weight: bold; color: #2d3748; font-size: 14px; }
         .status-desc { font-size: 12px; color: #718096; margin-top: 2px; }
-        
         .switch { position: relative; display: inline-block; width: 64px; height: 32px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #dc3545; transition: .3s ease; border-radius: 34px; }
         .slider:before { position: absolute; content: ""; height: 24px; width: 24px; left: 4px; bottom: 4px; background-color: white; transition: .3s ease; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         input:checked + .slider { background-color: #28a745; }
         input:checked + .slider:before { transform: translateX(32px); }
-        
         .status-badge { font-weight: bold; font-size: 13px; min-width: 65px; text-align: right; display: inline-block; text-transform: uppercase; transition: color 0.2s ease; }
         .status-badge.active { color: #28a745; }
         .status-badge.inactive { color: #dc3545; }
-
         .btn-submit { width: 100%; padding: 14px; background-color: #1e3a8a; border: none; color: white; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 25px; }
         .btn-submit:hover { background-color: #1d4ed8; }
-        .btn-submit btn-update { background-color: #28a745; }
-        .btn-submit btn-update:hover { background-color: #218838; }
-        
         .msg-box { padding: 12px; border-radius: 4px; margin-bottom: 20px; text-align: center; font-size: 14px; font-weight: bold; }
         .success-msg { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .error-msg { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
@@ -248,18 +262,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <label for="residence_country">Country of Residence (Auto-Search Combobox)</label>
                 <input type="text" id="residence_country" name="residence_country" list="countries" value="<?php echo htmlspecialchars($residence_country); ?>" placeholder="Type to search and filter country selection..." required>
                 <datalist id="countries">
-                    <option value="Australia">
-                    <option value="Canada">
-                    <option value="France">
-                    <option value="Germany">
-                    <option value="India">
-                    <option value="Italy">
-                    <option value="Japan">
-                    <option value="New Zealand">
-                    <option value="Singapore">
-                    <option value="Sri Lanka">
-                    <option value="United Kingdom">
-                    <option value="United States">
+                    <option value="Australia"><option value="Canada"><option value="France"><option value="Germany"><option value="India"><option value="Italy"><option value="Japan"><option value="New Zealand"><option value="Singapore"><option value="Sri Lanka"><option value="United Kingdom"><option value="United States">
                 </datalist>
             </div>
 
@@ -284,6 +287,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <input type="number" id="age" name="age" min="20" max="120" value="<?php echo htmlspecialchars($age); ?>" placeholder="e.g., 34" required>
             </div>
 
+            <?php if (!$is_update_mode): ?>
+                <div class="section-divider full-width">System Security Login Allocation</div>
+                <div>
+                    <label for="email">System Login Email Address</label>
+                    <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($email); ?>" placeholder="e.g., john@example.com" required>
+                </div>
+                <div>
+                    <label for="password">Portal Access Account Password</label>
+                    <input type="password" id="password" name="password" placeholder="Create robust password assignment" required>
+                </div>
+            <?php endif; ?>
+
             <div class="full-width" style="margin-top: 10px;">
                 <label>Sponsor Lifecycle System Status</label>
                 <div class="status-container">
@@ -305,9 +320,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
 
         <?php if ($is_update_mode): ?>
-            <button type="submit" class="btn-submit btn-update" style="background-color: #28a745;">Update Sponsor Record</button>
+            <button type="submit" class="btn-submit" style="background-color: #28a745;">Update Sponsor Record</button>
         <?php else: ?>
-            <button type="submit" class="btn-submit">Create New Sponsor</button>
+            <button type="submit" class="btn-submit">Create New Sponsor & Login</button>
         <?php endif; ?>
     </form>
     
@@ -315,7 +330,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </div>
 
 <script>
-// Client-side control to handle real-time UI text update of the slide toggle status bar
 document.getElementById('status_toggle').addEventListener('change', function() {
     var txtEl = document.getElementById('statusTxt');
     if(this.checked) {
@@ -327,19 +341,13 @@ document.getElementById('status_toggle').addEventListener('change', function() {
     }
 });
 
-// Client-side integration to auto-calculate/verify age field matches selected DOB year metric
 document.getElementById('dob').addEventListener('change', function() {
     var birthDate = new Date(this.value);
     if(isNaN(birthDate)) return;
-    
     var today = new Date();
     var age = today.getFullYear() - birthDate.getFullYear();
     var m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-    }
-    
-    // Auto-update age input field to assist the administrator
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) { age--; }
     if(age >= 20) {
         document.getElementById('age').value = age;
     } else {
@@ -347,11 +355,9 @@ document.getElementById('dob').addEventListener('change', function() {
     }
 });
 
-// Secondary security verification handling form submission
 document.getElementById('sponsorForm').addEventListener('submit', function(e) {
     var dobInput = document.getElementById('dob').value;
     var maxAllowed = "<?php echo $max_dob_allowed; ?>";
-    
     if (dobInput > maxAllowed) {
         e.preventDefault();
         alert("Registration Rejected: Sponsor must be at least 20 years old.");
