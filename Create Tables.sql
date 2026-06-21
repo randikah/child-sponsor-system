@@ -138,3 +138,14 @@ CREATE TABLE IF NOT EXISTS letters (
 
 ALTER TABLE users 
 ADD COLUMN password_changed TINYINT(1) DEFAULT 0 AFTER role;
+
+ALTER TABLE letters CHANGE COLUMN letter_title letter_content TEXT NOT NULL;
+
+
+ALTER TABLE child_sponsor_matches CHANGE COLUMN sponsor_user_id sponsor_id INT NOT NULL;
+
+ALTER TABLE `users` ADD COLUMN `user_type_id` VARCHAR(50) NULL DEFAULT NULL AFTER `role`;
+
+
+ALTER TABLE `users` 
+MODIFY COLUMN `role` ENUM('Admin', 'Coordinator', 'Sponsor', 'Child') NOT NULL;

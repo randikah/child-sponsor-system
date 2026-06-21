@@ -33,7 +33,7 @@ if ($_SESSION['role'] === 'Admin' || $_SESSION['role'] === 'Coordinator') {
     $verified = true;
 } else {
     $v_stmt = $conn->prepare("SELECT id FROM child_sponsor_matches WHERE child_id = ? AND sponsor_user_id = ? AND match_status = 'Active'");
-    $v_stmt->bind_param("ss", $child_id, $sponsor_id);
+    $v_stmt->bind_param("si", $child_id, $sponsor_id);
     $v_stmt->execute();
     if ($v_stmt->get_result()->num_rows > 0) {
         $verified = true;
@@ -81,10 +81,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 
     if ($upload_ok && (!empty($letter_text) || !empty($filename_db))) {
-        // We explicitly insert 'Pending' as the initial status.
-        $ins_letter = $conn->prepare("INSERT INTO letters (sender_role, child_id, sponsor_user_id, letter_title, file_path, status) VALUES ('Sponsor', ?, ?, ?, ?, 'Pending')");
-        $default_title = "Letter to Beneficiary";
-        $ins_letter->bind_param("ssss", $child_id, $sponsor_id, $letter_text, $filename_db); 
+        // Enforce clean mapping rules for query inputs - UPDATED column name to letter_content
+        $ins_letter = $conn->prepare("INSERT INTO letters (sender_role, child_id, sponsor_user_id, letter_content, file_path, status) VALUES ('Sponsor', ?, ?, ?, ?, 'Pending')");
+        $ins_letter->bind_param("siss", $child_id, $user_id, $letter_text, $filename_db); 
         
         if ($ins_letter->execute()) {
             $message = "✓ Letter entry submitted successfully! It is now 'Pending' awaiting Coordinator review.";
@@ -105,13 +104,21 @@ $stmt->execute();
 $child_data = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-// 3. FETCH COMPREHENSIVE COMMUNICATIONS HISTORY TRACKING REGISTRY
-$letters_history = [];
-$letter_stmt = $conn->prepare("SELECT * FROM letters WHERE child_id = ? ORDER BY created_at DESC");
-$letter_stmt->bind_param("s", $child_id);
-$letter_stmt->execute();
-$letters_history = $letter_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$letter_stmt->close();
+// 3. DYNAMIC DISPATCH QUERY: Load all historical outbound entries matching this profile
+$sponsor_letters = [];
+$sponsor_stmt = $conn->prepare("SELECT * FROM letters WHERE child_id = ? AND sender_role = 'Sponsor' ORDER BY created_at DESC");
+$sponsor_stmt->bind_param("s", $child_id);
+$sponsor_stmt->execute();
+$sponsor_letters = $sponsor_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$sponsor_stmt->close();
+
+// 4. DYNAMIC INBOUND QUERY: Load only approved incoming child entries matching this profile
+$child_letters = [];
+$child_stmt = $conn->prepare("SELECT * FROM letters WHERE child_id = ? AND sender_role = 'Child' AND status = 'Approved' ORDER BY created_at DESC");
+$child_stmt->bind_param("s", $child_id);
+$child_stmt->execute();
+$child_letters = $child_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$child_stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -225,9 +232,7 @@ $letter_stmt->close();
                 </tr>
             </thead>
             <tbody>
-                <?php 
-                $sponsor_letters = array_filter($letters_history, function($l) { return $l['sender_role'] !== 'Child'; });
-                if (count($sponsor_letters) > 0): 
+                <?php if (count($sponsor_letters) > 0): 
                     foreach ($sponsor_letters as $let): 
                         $status = $let['status'] ?? 'Pending';
                         $badge_class = 'badge-pending';
@@ -236,7 +241,7 @@ $letter_stmt->close();
                 ?>
                     <tr>
                         <td><strong><?php echo date("M d, Y", strtotime($let['created_at'])); ?></strong></td>
-                        <td><?php echo htmlspecialchars(substr($let['letter_title'], 0, 50)) . (strlen($let['letter_title']) > 50 ? '...' : ''); ?></td>
+                        <td><?php echo htmlspecialchars(substr($let['letter_content'] ?? '', 0, 50)) . (strlen($let['letter_content'] ?? '') > 50 ? '...' : ''); ?></td>
                         <td>
                             <span class="badge <?php echo $badge_class; ?>"><?php echo htmlspecialchars($status); ?></span>
                             <?php if ($status === 'Rejected' && !empty($let['coordinator_comment'])): ?>
@@ -251,7 +256,7 @@ $letter_stmt->close();
                             <?php endif; ?>
                         </td>
                         <td>
-                            <button class="btn-action" onclick="openLetterModal('My Dispatched Letter', <?php echo htmlspecialchars(json_encode($let['letter_title'])); ?>, '<?php echo $status; ?>', <?php echo htmlspecialchars(json_encode($let['coordinator_comment'] ?? '')); ?>)">Open Document</button>
+                            <button class="btn-action" onclick="openLetterModal('My Dispatched Letter', <?php echo htmlspecialchars(json_encode($let['letter_content'] ?? '')); ?>, '<?php echo $status; ?>', <?php echo htmlspecialchars(json_encode($let['coordinator_comment'] ?? '')); ?>)">Open Document</button>
                         </td>
                     </tr>
                 <?php 
@@ -272,33 +277,44 @@ $letter_stmt->close();
                     <th>Date Received</th>
                     <th>Sender Classification</th>
                     <th>Letter Content</th>
+                    <th>File Attachment</th>
                     <th>Action Link</th>
                 </tr>
             </thead>
             <tbody>
-                <?php 
-                $child_letters = array_filter($letters_history, function($l) { return $l['sender_role'] === 'Child'; });
-                if (count($child_letters) > 0): 
+                <?php if (count($child_letters) > 0): 
                     foreach ($child_letters as $let): 
                 ?>
                     <tr>
                         <td><strong><?php echo date("M d, Y", strtotime($let['created_at'])); ?></strong></td>
                         <td><span style="color: #b45309; font-weight: bold;">📥 Beneficiary Child</span></td>
-                        <td><?php echo htmlspecialchars(substr($let['letter_title'], 0, 50)) . (strlen($let['letter_title']) > 50 ? '...' : ''); ?></td>
+                        <td><?php echo htmlspecialchars(substr($let['letter_content'] ?? '', 0, 50)) . (strlen($let['letter_content'] ?? '') > 50 ? '...' : ''); ?></td>
                         <td>
-                            <button class="btn-action" onclick="openLetterModal('Letter from Child', <?php echo htmlspecialchars(json_encode($let['letter_title'])); ?>, 'Approved', '')">Read Mail Entry</button>
+                            <?php if (!empty($let['file_path'])): ?>
+                                <a href="<?php echo htmlspecialchars($let['file_path']); ?>#toolbar=0&navpanes=0" 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   onclick="window.open(this.href, 'targetWindow', 'toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=800,height=600'); return false;" 
+                                   style="color: #2b6cb0; font-weight:600; text-decoration:none;">
+                                   📄 View File Only
+                                </a>
+                            <?php else: ?>
+                                <span style="color: #a0aec0;">None</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <button class="btn-action" onclick="openLetterModal('Letter from Child', <?php echo htmlspecialchars(json_encode($let['letter_content'] ?? '')); ?>, 'Approved', '')">Read Mail Entry</button>
                         </td>
                     </tr>
                 <?php 
                     endforeach; 
                 else: 
                 ?>
-                    <tr><td colspan="4" style="text-align: center; color: #a0aec0;">No letters received from this child beneficiary yet.</td></tr>
+                    <tr><td colspan="5" style="text-align: center; color: #a0aec0;">No cleared letters received from this child beneficiary yet.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
-</div>
 
 <div id="letterModal" class="modal-mask">
     <div class="modal-body">

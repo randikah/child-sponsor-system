@@ -6,12 +6,13 @@ require_once 'db_connect.php';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $login_input = trim($_POST['username']); 
-    $password = trim($_POST['password']);
+    // Accepts either Username or Email address from the text field input
+    $login_input = trim($_POST['username'] ?? ''); 
+    $password = trim($_POST['password'] ?? '');
 
     if (!empty($login_input) && !empty($password)) {
-        // Find user by username OR email address
-        $stmt = $conn->prepare("SELECT id, username, email, password, role, password_changed FROM users WHERE username = ? OR email = ?");
+        // Find user by username OR email address (Added user_type_id to the SELECT query)
+        $stmt = $conn->prepare("SELECT id, username, email, password, role, user_type_id, password_changed FROM users WHERE username = ? OR email = ?");
         $stmt->bind_param("ss", $login_input, $login_input);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -21,14 +22,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             // Verify the hashed password
             if (password_verify($password, $user['password'])) {
-                // Set core authentication session variables
+                // Set universal core authentication session variables
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['email'] = $user['email'];
                 $_SESSION['role'] = $user['role'];
-                $_SESSION['sponsor_id'] = ''; 
+                $_SESSION['user_type_id'] = $user['user_type_id']; // Instantly save their C00000000X identifier string
+                $_SESSION['sponsor_id'] = ''; // Initialize blank default tracking state
 
-                // Resolve relational sponsor profile ID if the logging-in user is a Sponsor
+                // DYNAMIC MAPPING: If a Sponsor logs in, resolve their relational profile code
                 if ($user['role'] === 'Sponsor') {
                     $sp_check = $conn->prepare("SELECT id FROM sponsors WHERE user_id = ?");
                     $sp_check->bind_param("i", $user['id']);
@@ -36,27 +38,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $sp_res = $sp_check->get_result();
                     
                     if ($sp_row = $sp_res->fetch_assoc()) {
+                        // Persist custom tracking code (e.g., S000000001) globally across the session
                         $_SESSION['sponsor_id'] = $sp_row['id']; 
                     }
                     $sp_check->close();
                 }
 
                 // --- UNIVERSAL FIRST-TIME LOGIN ENFORCEMENT ---
-                // This now applies to ALL users (Sponsors, Coordinators, Admins, etc.)
+                // Intercepts ANY role if password has never been changed
                 if ((int)$user['password_changed'] === 0) {
                     $_SESSION['require_password_change'] = true;
                     header("Location: change_password.php");
                     exit();
                 }
 
-                // SECURE DASHBOARD ROUTING (Only reached if password has already been changed)
+                // SECURE REDIRECTION: Route users cleanly based on their authority role
                 if ($user['role'] === 'Admin') {
                     header("Location: admin_dashboard.php");
                 } elseif ($user['role'] === 'Coordinator') {
                     header("Location: coordinator_dashboard.php");
                 } elseif ($user['role'] === 'Sponsor') {
                     header("Location: sponsor_dashboard.php");
+                } elseif ($user['role'] === 'Child') {
+                    // Clean navigation redirect straight to the child workspace dashboard
+                    header("Location: child_dashboard.php");
                 } else {
+                    // Fallback block safeguard
                     $error = "Access Denied: Unrecognized system access classification.";
                 }
                 
@@ -167,8 +174,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <form action="login.php" method="POST">
         <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" id="username" name="username" required autocomplete="username">
+            <label for="username">Username or Email Address</label>
+            <input type="text" id="username" name="username" placeholder="Enter Username or Email" required autocomplete="username">
         </div>
         <div class="form-group">
             <label for="password">Password</label>
