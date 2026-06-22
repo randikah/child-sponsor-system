@@ -34,9 +34,9 @@ $sp_stmt->close();
 $sponsored_children = [];
 if (!empty($sponsor_id)) {
     $child_query = $conn->prepare("
-        SELECT c.id, c.first_name, c.last_name, c.age, c.education_level 
+        SELECT c.user_id, c.first_name, c.last_name, c.age, c.education_level 
         FROM child_sponsor_matches m 
-        JOIN child c ON m.child_id = c.id 
+        JOIN child c ON m.child_id = c.user_id 
         WHERE m.sponsor_user_id = ? AND m.match_status = 'Active'
     ");
     $child_query->bind_param("s", $sponsor_id);
@@ -126,13 +126,13 @@ if (!empty($sponsor_id)) {
                     <?php foreach ($sponsored_children as $child): ?>
                         <div class="child-card">
                             <div class="child-meta">
-                                <span class="child-id"><?php echo htmlspecialchars($child['id']); ?></span>
+                                <span class="child-id"><?php echo htmlspecialchars($child['user_id']); ?></span>
                                 <div class="child-name"><?php echo htmlspecialchars($child['first_name'] . ' ' . $child['last_name']); ?></div>
                                 <div style="color: #718096; font-size: 13px; margin-top: 4px;">
                                     Age: <?php echo htmlspecialchars($child['age']); ?> Yrs | Ed: <?php echo htmlspecialchars($child['education_level']); ?>
                                 </div>
                             </div>
-                            <a href="view_child_details.php?id=<?php echo urlencode($child['id']); ?>" class="btn-view">
+                            <a href="view_child_details.php?id=<?php echo urlencode($child['user_id']); ?>" class="btn-view">
                                 Open Profile & Correspondence Center →
                             </a>
                         </div>

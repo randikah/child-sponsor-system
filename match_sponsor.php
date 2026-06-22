@@ -30,7 +30,7 @@ if (isset($_GET['search_sponsor_id']) && !empty(trim($_GET['search_sponsor_id'])
 
 // 2. LOAD BENEFICIARY PROFILE & CHECK ACTIVE SPONSORSHIP STATUS
 if (!empty($child_id)) {
-    $stmt = $conn->prepare("SELECT * FROM child WHERE id = ?");
+    $stmt = $conn->prepare("SELECT * FROM child WHERE user_id = ?");
     $stmt->bind_param("s", $child_id);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -238,7 +238,7 @@ if (!empty($sponsor_id)) {
                     <div class="card-title">Beneficiary Summary Matrix</div>
                     <div class="profile-row">
                         <span class="profile-label">System Record ID:</span>
-                        <span class="profile-value" style="font-family: monospace; font-weight: bold; color: #2b6cb0;"><?php echo htmlspecialchars($child_data['id']); ?></span>
+                        <span class="profile-value" style="font-family: monospace; font-weight: bold; color: #2b6cb0;"><?php echo htmlspecialchars($child_data['user_id']); ?></span>
                     </div>
                     <div class="profile-row">
                         <span class="profile-label">Full Legal Name:</span>
@@ -363,7 +363,7 @@ if (!empty($sponsor_id)) {
                     <?php if ($child_data && $sponsor_data && !$has_active_sponsorship): ?>
                         <form action="match_sponsor.php?search_child_id=<?php echo urlencode($child_id); ?>&search_sponsor_id=<?php echo urlencode($sponsor_id); ?>" method="POST">
                             <input type="hidden" name="action" value="create_match">
-                            <input type="hidden" name="match_child_id" value="<?php echo htmlspecialchars($child_data['id']); ?>">
+                            <input type="hidden" name="match_child_id" value="<?php echo htmlspecialchars($child_data['user_id']); ?>">
                             <input type="hidden" name="match_sponsor_id" value="<?php echo htmlspecialchars($sponsor_data['id']); ?>">
                             
                             <button type="submit" class="btn-action">Link Sponsor to Child</button>

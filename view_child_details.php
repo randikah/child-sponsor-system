@@ -32,7 +32,7 @@ $verified = false;
 if ($_SESSION['role'] === 'Admin' || $_SESSION['role'] === 'Coordinator') {
     $verified = true;
 } else {
-    $v_stmt = $conn->prepare("SELECT id FROM child_sponsor_matches WHERE child_id = ? AND sponsor_user_id = ? AND match_status = 'Active'");
+    $v_stmt = $conn->prepare("SELECT id FROM child_sponsor_matches WHERE child_id = ? and match_status = 'Active'");
     $v_stmt->bind_param("si", $child_id, $sponsor_id);
     $v_stmt->execute();
     if ($v_stmt->get_result()->num_rows > 0) {
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // 2. FETCH DETAILED BENEFICIARY PROFILE CARD DATA
 $child_data = null;
-$stmt = $conn->prepare("SELECT * FROM child WHERE id = ?");
+$stmt = $conn->prepare("SELECT * FROM child WHERE user_id = ?");
 $stmt->bind_param("s", $child_id);
 $stmt->execute();
 $child_data = $stmt->get_result()->fetch_assoc();
