@@ -49,7 +49,7 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'Coordinator' && $_SE
         <h2>Coordinator Panel</h2>
         <a href="#" class="active">🏠 Overview</a>
         <a href="register_child.php">👶 Manage Child Profiles</a>
-        <a href="update_child.php" class="btn-action">✏️ Update Child Profile Details</a>
+        <!--<a href="update_child.php" class="btn-action">✏️ Update Child Profile Details</a>-->
         <a href="register_sponsor.php">#️⃣ Manage Sponsors</a>
         <a href="#">✉️ Correspondence</a>
  
@@ -71,14 +71,19 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'Coordinator' && $_SE
                 <a href="register_child.php" class="btn-action">+ Register Child</a>
             </div>
             <div class="action-card">
-                <h3>Sponsor Matches</h3>
-                <p>Link  sponsorship and  active assignments.</p>
+                <h3>Sponsor Records</h3>
+                <p>Register new sponsor profiles into the centralized system, update documentation, and track ongoing progress metrics.</p>
+                <a href="register_sponsor.php" class="btn-action">+ Register Sponsor</a>
+            </div>
+            <div class="action-card">
+                <h3>Sponsor Child Matches</h3>
+                <p>Link  sponsorship to a child and  active assignments.</p>
                 <a href="match_sponsor.php" class="btn-action">Link Sponsor to Child</a>
             </div>
             <div class="action-card">
                 <h3>Mediated Correspondence</h3>
                 <p>Review, screen, and route incoming communication entries between sponsors and children to maintain protection standards.</p>
-                <a href="#" class="btn-action">Open Message Queue</a>
+                <a href="coordinator_mediation.php" class="btn-action">Open Message Queue</a>
             </div>
         </div>
     </div>

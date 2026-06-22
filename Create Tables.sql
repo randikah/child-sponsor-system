@@ -120,3 +120,32 @@ ALTER TABLE child_sponsor_matches
 ADD CONSTRAINT fk_match_sponsor 
 FOREIGN KEY (sponsor_user_id) REFERENCES sponsors (id) 
 ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE sponsors ADD COLUMN user_id INT(11) NULL AFTER id;
+
+
+CREATE TABLE IF NOT EXISTS letters (
+    id INT(11) AUTO_INCREMENT PRIMARY KEY,
+    child_id VARCHAR(50) NOT NULL,
+    sponsor_id VARCHAR(50) NOT NULL,
+    sender_role ENUM('Sponsor', 'Child', 'Coordinator', 'Admin') NOT NULL,
+    letter_title VARCHAR(255) NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+ALTER TABLE users 
+ADD COLUMN password_changed TINYINT(1) DEFAULT 0 AFTER role;
+
+ALTER TABLE letters CHANGE COLUMN letter_title letter_content TEXT NOT NULL;
+
+
+ALTER TABLE child_sponsor_matches CHANGE COLUMN sponsor_user_id sponsor_id INT NOT NULL;
+
+ALTER TABLE `users` ADD COLUMN `user_type_id` VARCHAR(50) NULL DEFAULT NULL AFTER `role`;
+
+
+ALTER TABLE `users` 
+MODIFY COLUMN `role` ENUM('Admin', 'Coordinator', 'Sponsor', 'Child') NOT NULL;

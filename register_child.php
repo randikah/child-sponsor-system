@@ -40,7 +40,7 @@ $language = '';
 $education_level = '';
 $health_status = '';
 
-// 1. DYNAMIC SEARCH FUNCTIONALITY
+// 1. DYNAMIC SEARCH FUNCTIONALITY (Updated to use user_id)
 $search_id = '';
 if (isset($_GET['search_id']) && !empty(trim($_GET['search_id']))) {
     $search_id = trim($_GET['search_id']);
@@ -52,7 +52,7 @@ if (!empty($search_id)) {
     $is_update_mode = true;
     $child_id = $search_id;
 
-    $stmt = $conn->prepare("SELECT * FROM child WHERE id = ?");
+    $stmt = $conn->prepare("SELECT * FROM child WHERE user_id = ?");
     $stmt->bind_param("s", $child_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -108,7 +108,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $mother_age = intval($_POST['mother_age'] ?? 0);
     $mother_occupation = trim($_POST['mother_occupation'] ?? '');
     
-    // STRICT NULL TREATMENT: Forces real PHP null types so MySQL stores them as NULL instead of 0000-00-00 / 0
     $father_first_name = (!isset($_POST['father_first_name']) || trim($_POST['father_first_name']) === '') ? null : trim($_POST['father_first_name']);
     $father_last_name  = (!isset($_POST['father_last_name']) || trim($_POST['father_last_name']) === '') ? null : trim($_POST['father_last_name']);
     $father_dob        = (!isset($_POST['father_dob']) || trim($_POST['father_dob']) === '') ? null : $_POST['father_dob'];
@@ -126,7 +125,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $form_child_id = trim($_POST['child_id'] ?? '');
     $registered_by = $_SESSION['user_id'];
 
-    // Age validation rules check
     $birthday = new DateTime($dob);
     $now = new DateTime();
     $calculated_age = $now->diff($birthday)->y;
@@ -140,8 +138,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     } else {
         if ($action_mode === 'update' && !empty($form_child_id)) {
-            // EXECUTE RECORD UPDATE
-            $stmt = $conn->prepare("UPDATE child SET first_name = ?, last_name = ?, dob = ?, age = ?, mother_first_name = ?, mother_last_name = ?, mother_dob = ?, mother_age = ?, mother_occupation = ?, father_first_name = ?, father_last_name = ?, father_dob = ?, father_age = ?, residence_country = ?, religion = ?, nationality = ?, language = ?, education_level = ?, health_status = ? WHERE id = ?");
+            // EXECUTE RECORD UPDATE (Updated WHERE clause to user_id)
+            $stmt = $conn->prepare("UPDATE child SET first_name = ?, last_name = ?, dob = ?, age = ?, mother_first_name = ?, mother_last_name = ?, mother_dob = ?, mother_age = ?, mother_occupation = ?, father_first_name = ?, father_last_name = ?, father_dob = ?, father_age = ?, residence_country = ?, religion = ?, nationality = ?, language = ?, education_level = ?, health_status = ? WHERE user_id = ?");
             
             $stmt->bind_param("sssisssisssissssssss", 
                 $first_name, $last_name, $dob, $age,
@@ -165,27 +163,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->close();
 
         } else {
-            // EXECUTE NEW CHILD CREATION WITH ALPHANUMERIC GENERATOR
-            $id_query = "SELECT MAX(CAST(SUBSTRING(id, 2) AS UNSIGNED)) as max_id FROM child";
-            $id_result = $conn->query($id_query);
-            $row = $id_result->fetch_assoc();
-            $next_num = ($row['max_id'] !== null) ? $row['max_id'] + 1 : 1;
-            
-            $padded_number = str_pad($next_num, 9, "0", STR_PAD_LEFT);
-            $child_custom_id = "C" . $padded_number;
+            // START TRANSACTION TO ENSURE BOTH INSERTS ARE SUCCESSFUL
+            $conn->begin_transaction();
 
-            $stmt = $conn->prepare("INSERT INTO child (id, first_name, last_name, dob, age, mother_first_name, mother_last_name, mother_dob, mother_age, mother_occupation, father_first_name, father_last_name, father_dob, father_age, residence_country, religion, nationality, language, education_level, health_status, registered_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            
-            $stmt->bind_param("ssssisssisssisssssssi", 
-                $child_custom_id, $first_name, $last_name, $dob, $age,
-                $mother_first_name, $mother_last_name, $mother_dob, $mother_age, $mother_occupation,
-                $father_first_name, $father_last_name, $father_dob, $father_age,
-                $residence_country, $religion, $nationality, $language,
-                $education_level, $health_status, $registered_by
-            );
+            try {
+                // 1. EXECUTE NEW CHILD CREATION WITH ALPHANUMERIC GENERATOR (Updated query column to user_id)
+                $id_query = "SELECT MAX(CAST(SUBSTRING(user_id, 2) AS UNSIGNED)) as max_id FROM child";
+                $id_result = $conn->query($id_query);
+                $row = $id_result->fetch_assoc();
+                $next_num = ($row['max_id'] !== null) ? $row['max_id'] + 1 : 1;
+                
+                $padded_number = str_pad($next_num, 9, "0", STR_PAD_LEFT);
+                $child_custom_id = "C" . $padded_number;
 
-            if ($stmt->execute()) {
-                $message = "✓ Child profile securely registered with ID: <strong>$child_custom_id</strong> for '$first_name $last_name'.";
+                // Updated column listing from 'id' to 'user_id'
+                $stmt = $conn->prepare("INSERT INTO child (user_id, first_name, last_name, dob, age, mother_first_name, mother_last_name, mother_dob, mother_age, mother_occupation, father_first_name, father_last_name, father_dob, father_age, residence_country, religion, nationality, language, education_level, health_status, registered_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                
+                $stmt->bind_param("ssssisssisssisssssssi", 
+                    $child_custom_id, $first_name, $last_name, $dob, $age,
+                    $mother_first_name, $mother_last_name, $mother_dob, $mother_age, $mother_occupation,
+                    $father_first_name, $father_last_name, $father_dob, $father_age,
+                    $residence_country, $religion, $nationality, $language,
+                    $education_level, $health_status, $registered_by
+                );
+                $stmt->execute();
+                $stmt->close();
+
+                // 2. AUTOMATICALLY CREATE SYSTEM USER ACCOUNT FOR THE CHILD
+                $generated_username = trim($first_name) . $next_num; // e.g., Randika1
+                $generated_email = strtolower(trim($first_name)) . "." . $child_custom_id . "@example.com"; 
+                $default_password_hash = password_hash('child123', PASSWORD_BCRYPT); 
+                $user_role = 'Child';
+                $password_changed = 0; 
+
+                $user_stmt = $conn->prepare("INSERT INTO users (username, email, password, role, user_type_id, password_changed, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+                $user_stmt->bind_param("sssssi", $generated_username, $generated_email, $default_password_hash, $user_role, $child_custom_id, $password_changed);
+                $user_stmt->execute();
+                $user_stmt->close();
+
+                // Commit changes safely
+                $conn->commit();
+
+                $message = "✓ Child profile securely registered with ID: <strong>$child_custom_id</strong>.<br>⚡ Login Account Provisioned! Username: <strong>$generated_username</strong> | Password: <strong>child123</strong>";
                 $message_class = "success-msg";
                 
                 // Clear variables cleanly on success
@@ -193,11 +212,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $mother_first_name = $mother_last_name = $mother_dob = $mother_age = $mother_occupation = '';
                 $father_first_name = $father_last_name = $father_dob = $father_age = '';
                 $religion = $language = $education_level = $health_status = '';
-            } else {
-                $message = "❌ System execution insert error: " . $stmt->error;
+
+            } catch (Exception $e) {
+                // Rollback database modifications entirely if any query fails
+                $conn->rollback();
+                $message = "❌ System execution insert error: " . $e->getMessage();
                 $message_class = "error-msg";
             }
-            $stmt->close();
         }
     }
 }
@@ -238,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .btn-update { background-color: #28a745; }
         .btn-update:hover { background-color: #218838; }
         
-        .msg-box { padding: 12px; border-radius: 4px; margin-bottom: 20px; text-align: center; font-size: 14px; font-weight: bold; }
+        .msg-box { padding: 12px; border-radius: 4px; margin-bottom: 20px; text-align: center; font-size: 14px; font-weight: bold; line-height: 1.6; }
         .success-msg { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .error-msg { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         .nav-link { display: block; text-align: center; margin-top: 15px; color: #1e3a8a; text-decoration: none; font-size: 14px; font-weight: bold; }
