@@ -97,8 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     if ($upload_ok && (!empty($letter_text) || !empty($filename_db))) {
         // Enforce clean mapping rules for query inputs - UPDATED column name to letter_content
-        $ins_letter = $conn->prepare("INSERT INTO letters (sender_role, child_id, sponsor_user_id, letter_content, file_path, status) VALUES ('Sponsor', ?, ?, ?, ?, 'Pending')");
-        $ins_letter->bind_param("siss", $child_id, $user_id, $letter_text, $filename_db); 
+        $ins_letter = $conn->prepare("INSERT INTO letters (sender_role, child_id, sponsor_user_id, letter_content, file_path, status) VALUES ('Child', ?, ?, ?, ?, 'Pending')");
+        $ins_letter->bind_param("ssss", $child_id, $sponsor_id, $letter_text, $filename_db); 
         
         if ($ins_letter->execute()) {
             $message = "✓ Letter entry submitted successfully! It is now 'Pending' awaiting Coordinator review.";
@@ -220,7 +220,8 @@ $child_stmt->close();
 
         <div class="column-card">
             <div class="card-title">Write / Upload a Letter</div>
-            <form action="view_child_details.php?id=<?php echo urlencode($child_id); ?>" method="POST" enctype="multipart/form-data">
+            <!--<form action="view_child_details.php?id=<?php echo urlencode($child_id); ?>" method="POST" enctype="multipart/form-data"> -->
+            <form method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="send_letter">
                 
                 <label for="letter_content">Type Letter Body Message (will be translated for the child)</label>

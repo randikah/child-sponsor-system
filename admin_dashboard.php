@@ -11,6 +11,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Admin') {
 // Fetch analytics counts
 $user_count = $conn->query("SELECT COUNT(*) as total FROM users")->fetch_assoc()['total'];
 $child_count = $conn->query("SELECT COUNT(*) as total FROM child")->fetch_assoc()['total'];
+$active_sponsorships_count = $conn->query("SELECT COUNT(*) as total FROM child_sponsor_matches WHERE match_status = 'Active'")->fetch_assoc()['total'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -45,7 +46,7 @@ $child_count = $conn->query("SELECT COUNT(*) as total FROM child")->fetch_assoc(
     <div class="role-nav-group">
         <div class="role-nav-group-title">Navigate Dashboards</div>
         <a href="coordinator_dashboard.php" style="color: #93c5fd;">➡️ Coordinator Panel</a>
-        <a href="sponsor_dashboard.php" style="color: #a7f3d0;">➡️ Sponsor Portal</a>
+        <!--<a href="sponsor_dashboard.php" style="color: #a7f3d0;">➡️ Sponsor Portal</a>-->
     </div>
 </div>
 
@@ -67,7 +68,7 @@ $child_count = $conn->query("SELECT COUNT(*) as total FROM child")->fetch_assoc(
         </div>
         <div class="card">
             <h3>Active Sponsorships</h3>
-            <p>0</p>
+            <p><?php echo $active_sponsorships_count; ?></p>
         </div>
     </div>
 </div>

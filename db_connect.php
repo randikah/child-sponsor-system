@@ -5,8 +5,10 @@ $db_pass = ''; // Your MySQL password
 $db_name = 'child_sponsor_db';
 $db_port = 3307;
 
+
 // Create connection
 $conn = new mysqli($host, $db_user, $db_pass, $db_name,$db_port);
+$conn->set_charset("utf8mb4");
 
 // Check connection
 if ($conn->connect_error) {
