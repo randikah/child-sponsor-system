@@ -45,6 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $redirect_page = 'coordinator_dashboard.php';
                     } elseif ($_SESSION['role'] === 'Sponsor') {
                         $redirect_page = 'sponsor_dashboard.php';
+                    }elseif ($_SESSION['role'] === 'Child') {
+                        $redirect_page = 'child_dashboard.php';
                     }
                 }
 

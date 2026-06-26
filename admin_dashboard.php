@@ -46,7 +46,7 @@ $active_sponsorships_count = $conn->query("SELECT COUNT(*) as total FROM child_s
     <div class="role-nav-group">
         <div class="role-nav-group-title">Navigate Dashboards</div>
         <a href="coordinator_dashboard.php" style="color: #93c5fd;">➡️ Coordinator Panel</a>
-        <!--<a href="sponsor_dashboard.php" style="color: #a7f3d0;">➡️ Sponsor Portal</a>-->
+        <a href="admin_reset_password.php" style="color: #a7f3d0;">🔑 Reset User Password</a>
     </div>
 </div>
 
