@@ -1,3 +1,5 @@
+.\mysql -u root -P 3307 -h 127.0.0.1 -p child_sponsor_db
+
 -- 1. DROP EXISTING CONFLICTING TABLES IF ANY REMAIN
 DROP TABLE IF EXISTS child;
 DROP TABLE IF EXISTS sponsors;

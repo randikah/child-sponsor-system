@@ -171,7 +171,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <option value="" disabled selected>-- Select a Role --</option>
                 <option value="Admin">Admin</option>
                 <option value="Coordinator">Coordinator</option>
-                <option value="Sponsor">Sponsor</option>
             </select>
         </div>
 
