@@ -66,45 +66,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $target_sponsor_id = trim($_POST['match_sponsor_id'] ?? ''); 
     $assigned_by = $_SESSION['user_id'];
 
-    // Hard safety enforcement logic level check
     if ($has_active_sponsorship) {
-        $message = "❌ Security Violation Block: This beneficiary already possesses an Active sponsorship agreement.";
+        $message = "❌ Security Violation: This child is already sponsored.";
         $message_class = "error-msg";
     } elseif (!empty($target_child_id) && !empty($target_sponsor_id)) {
         
-        // Double-check to ensure duplicate matching pairings do not conflict 
-        $check_stmt = $conn->prepare("SELECT id FROM child_sponsor_matches WHERE child_id = ? AND sponsor_user_id = ? AND match_status = 'Active'");
+        // 1. Check if this specific pairing has existed before (even as Terminated)
+        $check_stmt = $conn->prepare("SELECT id, match_status FROM child_sponsor_matches WHERE child_id = ? AND sponsor_user_id = ?");
         $check_stmt->bind_param("ss", $target_child_id, $target_sponsor_id);
         $check_stmt->execute();
-        
-        if ($check_stmt->get_result()->num_rows > 0) {
-            $message = "❌ Error: This active sponsorship pairing combination already exists.";
-            $message_class = "error-msg";
+        $res = $check_stmt->get_result();
+
+        if ($res->num_rows > 0) {
+            $existing = $res->fetch_assoc();
+            
+            if ($existing['match_status'] === 'Active') {
+                $message = "❌ Error: This sponsor is already actively linked to this child.";
+                $message_class = "error-msg";
+            } else {
+                // 2. Reactivate the old "Terminated" record
+                $upd_stmt = $conn->prepare("UPDATE child_sponsor_matches SET match_status = 'Active', assigned_by_user_id = ? WHERE id = ?");
+                $upd_stmt->bind_param("ii", $assigned_by, $existing['id']);
+                $upd_stmt->execute();
+                $message = "✓ Sponsorship reactivated successfully!";
+                $message_class = "success-msg";
+            }
         } else {
-            // Insert matchup relationship row entry 
+            // 3. Brand new pairing
             $ins_stmt = $conn->prepare("INSERT INTO child_sponsor_matches (child_id, sponsor_user_id, match_status, assigned_by_user_id) VALUES (?, ?, 'Active', ?)");
             $ins_stmt->bind_param("ssi", $target_child_id, $target_sponsor_id, $assigned_by);
-            
-            if ($ins_stmt->execute()) {
-                $message = "✓ Sponsorship pairing saved successfully!";
-                $message_class = "success-msg";
-                $sponsor_id = ''; // Clear sponsor view state
-                
-                // Refresh the current match state tracking flag seamlessly
-                header("Location: match_sponsor.php?search_child_id=" . urlencode($target_child_id));
-                exit();
-            } else {
-                $message = "❌ System conflict error: " . $ins_stmt->error;
-                $message_class = "error-msg";
-            }
-            $ins_stmt->close();
+            $ins_stmt->execute();
+            $message = "✓ New sponsorship pairing created!";
+            $message_class = "success-msg";
         }
-        $check_stmt->close();
-    } else {
-        $message = "❌ Error: Missing mandatory child or sponsor unique mapping identifiers.";
-        $message_class = "error-msg";
+        header("Location: match_sponsor.php?search_child_id=" . urlencode($target_child_id));
+        exit();
     }
 }
+
 
 // 4. PROCESS MATCH TERMINATION DEACTIVATION (POST REQUEST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'terminate_match') {
