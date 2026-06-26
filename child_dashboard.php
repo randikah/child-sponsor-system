@@ -213,9 +213,9 @@ $child_stmt->close();
             <div class="card-title">My Assigned Sponsor Info</div>
             <div class="profile-row"><span class="profile-label">Sponsor ID:</span><span><?php echo htmlspecialchars($sponsor_id); ?></span></div>
             <div class="profile-row"><span class="profile-label">Sponsor Name:</span><span><?php echo htmlspecialchars($sponsor_name);; ?></span></div>
-                <pre style="background: #222; color: #00ff00; padding: 15px; border-radius: 5px; margin: 20px; font-size: 13px; overflow: auto;">
-                <strong>Active Session Dump Matrix:</strong>
-                <?php print_r($_SESSION); ?>
+                <!--<pre style="background: #222; color: #00ff00; padding: 15px; border-radius: 5px; margin: 20px; font-size: 13px; overflow: auto;">
+                <strong>Active Session Dump Matrix:</strong>-->
+                <?php // print_r($_SESSION); ?>
         </div>
 
         <div class="column-card">

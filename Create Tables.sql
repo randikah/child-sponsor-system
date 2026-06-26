@@ -1,5 +1,147 @@
-.\mysql -u root -P 3307 -h 127.0.0.1 -p child_sponsor_db
+How to run the SQL script to create the necessary tables in your MySQL database:
 
+login to the db using command prompt or terminal:    
+    cd C:\xampp\mysql\bin
+    .\mysql -u root -P 3307 -h 127.0.0.1 -p child_sponsor_db
+
+
+
+
+
+--*************************** 1. row ***************************
+       Table: child
+Create Table: CREATE TABLE `child` (
+  `internal_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` varchar(15) NOT NULL,
+  `first_name` varchar(50) NOT NULL,
+  `last_name` varchar(50) NOT NULL,
+  `dob` date NOT NULL,
+  `age` int(11) NOT NULL,
+  `mother_first_name` varchar(50) NOT NULL,
+  `mother_last_name` varchar(50) NOT NULL,
+  `mother_dob` date NOT NULL,
+  `mother_age` int(11) NOT NULL,
+  `mother_occupation` varchar(100) NOT NULL,
+  `father_first_name` varchar(50) DEFAULT NULL,
+  `father_last_name` varchar(50) DEFAULT NULL,
+  `father_dob` date DEFAULT NULL,
+  `father_age` int(11) DEFAULT NULL,
+  `residence_country` varchar(100) NOT NULL DEFAULT 'Sri Lanka',
+  `religion` varchar(50) NOT NULL,
+  `nationality` varchar(50) NOT NULL DEFAULT 'Sri Lankan',
+  `language` varchar(50) NOT NULL,
+  `education_level` varchar(50) NOT NULL,
+  `health_status` varchar(100) NOT NULL,
+  `registered_by_user_id` int(10) unsigned NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`internal_id`),
+  UNIQUE KEY `id` (`user_id`),
+  KEY `child_ibfk_1` (`registered_by_user_id`),
+  CONSTRAINT `child_ibfk_1` FOREIGN KEY (`registered_by_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+
+
+
+--MariaDB [child_sponsor_db]> SHOW CREATE TABLE child_sponsor_matches\G
+--*************************** 1. row ***************************
+       Table: child_sponsor_matches
+Create Table: CREATE TABLE `child_sponsor_matches` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `child_id` varchar(15) NOT NULL,
+  `sponsor_user_id` varchar(15) NOT NULL,
+  `match_status` enum('Active','Terminated','Pending') NOT NULL DEFAULT 'Active',
+  `assigned_by_user_id` int(10) unsigned NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_child_sponsor` (`child_id`,`sponsor_user_id`),
+  KEY `fk_match_assigned_by` (`assigned_by_user_id`),
+  KEY `fk_match_sponsor` (`sponsor_user_id`),
+  CONSTRAINT `fk_match_assigned_by` FOREIGN KEY (`assigned_by_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_match_child` FOREIGN KEY (`child_id`) REFERENCES `child` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_match_sponsor` FOREIGN KEY (`sponsor_user_id`) REFERENCES `sponsors` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+
+
+--MariaDB [child_sponsor_db]> SHOW CREATE TABLE letters\G
+--*************************** 1. row ***************************
+       Table: letters
+Create Table: CREATE TABLE `letters` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `child_id` varchar(50) NOT NULL,
+  `sponsor_user_id` varchar(50) NOT NULL,
+  `sender_role` enum('Sponsor','Child','Coordinator','Admin') NOT NULL,
+  `letter_content` text NOT NULL,
+  `file_path` varchar(255) NOT NULL,
+  `status` enum('Pending','Approved','Rejected') DEFAULT 'Pending',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `coordinator_comment` text DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+
+
+
+
+--MariaDB [child_sponsor_db]> SHOW CREATE TABLE sponsors\G
+--*************************** 1. row ***************************
+       Table: sponsors
+Create Table: CREATE TABLE `sponsors` (
+  `internal_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `id` varchar(15) DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `first_name` varchar(50) NOT NULL,
+  `last_name` varchar(50) NOT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `residence_country` varchar(100) NOT NULL,
+  `language` varchar(50) NOT NULL,
+  `dob` date NOT NULL,
+  `age` int(11) NOT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`internal_id`),
+  UNIQUE KEY `id` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+
+
+--MariaDB [child_sponsor_db]> SHOW CREATE TABLE users\G
+--*************************** 1. row ***************************
+       Table: users
+Create Table: CREATE TABLE `users` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `username` varchar(50) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `role` enum('Admin','Coordinator','Sponsor','Child') NOT NULL,
+  `user_type_id` varchar(50) DEFAULT NULL,
+  `password_changed` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------------OLD create tables script------------------------
 -- 1. DROP EXISTING CONFLICTING TABLES IF ANY REMAIN
 DROP TABLE IF EXISTS child;
 DROP TABLE IF EXISTS sponsors;

@@ -156,9 +156,9 @@ if (!empty($sponsor_id)) {
         </div>
     </div>
 
-    <pre style="background: #222; color: #00ff00; padding: 15px; border-radius: 5px; margin: 20px; font-size: 13px; overflow: auto;">
-    <strong>Active Session Dump Matrix:</strong>
-    <?php print_r($_SESSION); ?>
+    <!-- <pre style="background: #222; color: #00ff00; padding: 15px; border-radius: 5px; margin: 20px; font-size: 13px; overflow: auto;">
+    <strong>Active Session Dump Matrix:</strong> -->
+    <?php //print_r($_SESSION); ?> 
 </pre>
 </div>
 
